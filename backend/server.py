@@ -1095,7 +1095,14 @@ def sync_user_data():
         logging.error(f"Error in sync user data endpoint: {e}")
         return jsonify({"error": str(e)}), 500
 
+# ---------- HEALTH CHECK ENDPOINT ----------
+@app.route("/health", methods=["GET"])
+def health_check():
+    """Health check endpoint for Render deployment."""
+    return jsonify({"status": "healthy", "message": "DubMyYT backend is running"}), 200
+
 # ---------- RUN SERVER ----------
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(debug=False, host="0.0.0.0", port=port)
 

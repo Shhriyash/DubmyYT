@@ -3,11 +3,8 @@ services:
   - type: web
     name: dubmyyt-backend
     env: python
-    buildCommand: |
-      cd backend &&
-      pip install --upgrade pip &&
-      pip install -r requirements.txt
-    startCommand: cd backend && python server.py
+    buildCommand: ./build_backend.sh
+    startCommand: ./start_backend.sh
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.4
@@ -21,7 +18,28 @@ services:
         sync: false
       - key: FLASK_ENV
         value: production
-      - key: ENVIRONMENT
-        value: production
     healthCheckPath: /health
+    plan: free
+
+  # Frontend Service
+  - type: static
+    name: dubmyyt-frontend
+    buildCommand: |
+      cd frontend &&
+      npm ci &&
+      npm run build
+    staticPublishPath: ./frontend/build
+    envVars:
+      - key: NODE_VERSION
+        value: 18.17.0
+      - key: REACT_APP_SUPABASE_URL
+        sync: false
+      - key: REACT_APP_SUPABASE_ANON_KEY
+        sync: false
+      - key: REACT_APP_API_BASE_URL
+        value: https://dubmyyt-backend-ftv2.onrender.com
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
     plan: free

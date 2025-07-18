@@ -23,16 +23,35 @@ import requests
 # ---------- ENV & API KEYS ----------
 # Load environment variables
 load_dotenv(override=True)
-groq_key = os.getenv('groqclient', '').split(',')[0].strip()
+groq_key = os.getenv('GROQ_API_KEY', '').split(',')[0].strip()
 
-# Set Google Application Credentials from environment or default filename
-google_creds_file = os.getenv('GOOGLE_APPLICATION_CREDENTIALS', 'indiapost-439216-6a03ba3d322b.json')
-# Use absolute path relative to current script directory
-google_creds_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), google_creds_file)
-if os.path.exists(google_creds_path):
-    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = google_creds_path
+# Set Google Application Credentials - handle both file path and JSON string
+google_creds_json = os.getenv('GOOGLE_APPLICATION_CREDENTIALS_JSON')
+if google_creds_json:
+    # For production deployment (Render) - use JSON string
+    import tempfile
+    import json
+    
+    # Create temporary file with credentials
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+        if isinstance(google_creds_json, str):
+            # If it's a string, parse it as JSON
+            try:
+                creds_data = json.loads(google_creds_json)
+                json.dump(creds_data, f)
+            except json.JSONDecodeError:
+                print("Error: Invalid JSON in GOOGLE_APPLICATION_CREDENTIALS_JSON")
+                creds_data = {}
+        f.flush()
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = f.name
 else:
-    print(f"Warning: Google credentials file not found at {google_creds_path}")
+    # For local development - use file path
+    google_creds_file = os.getenv('GOOGLE_APPLICATION_CREDENTIALS', 'indiapost-439216-6a03ba3d322b.json')
+    google_creds_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), google_creds_file)
+    if os.path.exists(google_creds_path):
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = google_creds_path
+    else:
+        print(f"Warning: Google credentials file not found at {google_creds_path}")
 
 # Initialize Flask app
 app = Flask(__name__)

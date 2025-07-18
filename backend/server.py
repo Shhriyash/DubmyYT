@@ -27,21 +27,35 @@ groq_key = os.getenv('GROQ_API_KEY', '').split(',')[0].strip()
 
 # Set Google Application Credentials - handle both file path and JSON string
 google_creds_json = os.getenv('GOOGLE_APPLICATION_CREDENTIALS_JSON')
+google_creds_file_path = None
+
 if google_creds_json:
     # For production deployment (Render) - use JSON string
     try:
         # Parse the JSON string to validate it
         creds_data = json.loads(google_creds_json)
         
-        # Create temporary file with credentials
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
-            json.dump(creds_data, f)
-            f.flush()
-            os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = f.name
-            print(f"Google credentials loaded from environment variable to: {f.name}")
+        # Validate required fields
+        required_fields = ['type', 'project_id', 'private_key_id', 'private_key', 'client_email']
+        missing_fields = [field for field in required_fields if field not in creds_data]
+        
+        if missing_fields:
+            print(f"Error: Missing required fields in credentials: {missing_fields}")
+            google_creds_json = None
+        else:
+            # Create temporary file with credentials
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+                json.dump(creds_data, f)
+                f.flush()
+                google_creds_file_path = f.name
+                os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = f.name
+                print(f"Google credentials loaded from environment variable to: {f.name}")
     except json.JSONDecodeError as e:
         print(f"Error: Invalid JSON in GOOGLE_APPLICATION_CREDENTIALS_JSON: {e}")
         print("Using local file fallback...")
+        google_creds_json = None
+    except Exception as e:
+        print(f"Error processing Google credentials: {e}")
         google_creds_json = None
         
 if not google_creds_json:
@@ -50,6 +64,7 @@ if not google_creds_json:
     google_creds_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), google_creds_file)
     if os.path.exists(google_creds_path):
         os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = google_creds_path
+        google_creds_file_path = google_creds_path
         print(f"Google credentials loaded from file: {google_creds_path}")
     else:
         print(f"Warning: Google credentials file not found at {google_creds_path}")
@@ -70,11 +85,23 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
 # Initialize Google Translate client with error handling
+translate_client = None
 try:
-    translate_client = translate.Client()
-    print("Google Translate client initialized successfully")
+    # Give a moment for environment variable to be set
+    import time
+    time.sleep(0.1)
+    
+    if google_creds_file_path and os.path.exists(google_creds_file_path):
+        # Explicitly set credentials from file
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = google_creds_file_path
+        translate_client = translate.Client()
+        print("Google Translate client initialized successfully")
+    else:
+        print("Google credentials file not available - translate features will be disabled")
+        
 except Exception as e:
     print(f"Error initializing Google Translate client: {e}")
+    print("Translation features will be disabled - app will continue running")
     translate_client = None
 
 # ---------- SUPABASE CONFIG ----------
@@ -1134,6 +1161,21 @@ def sync_user_data():
 def health_check():
     """Health check endpoint for Render deployment."""
     return jsonify({"status": "healthy", "message": "DubMyYT backend is running"}), 200
+
+@app.route("/", methods=["GET"])
+def root():
+    """Root endpoint to show API information."""
+    return jsonify({
+        "message": "DubMyYT API is running",
+        "version": "1.0.0",
+        "endpoints": {
+            "health": "/health",
+            "upload": "/upload",
+            "user_dashboard": "/user-dashboard",
+            "user_analytics": "/user-analytics"
+        },
+        "status": "healthy"
+    }), 200
 
 # ---------- RUN SERVER ----------
 if __name__ == "__main__":

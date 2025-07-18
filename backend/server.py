@@ -29,27 +29,28 @@ groq_key = os.getenv('GROQ_API_KEY', '').split(',')[0].strip()
 google_creds_json = os.getenv('GOOGLE_APPLICATION_CREDENTIALS_JSON')
 if google_creds_json:
     # For production deployment (Render) - use JSON string
-    import tempfile
-    import json
-    
-    # Create temporary file with credentials
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
-        if isinstance(google_creds_json, str):
-            # If it's a string, parse it as JSON
-            try:
-                creds_data = json.loads(google_creds_json)
-                json.dump(creds_data, f)
-            except json.JSONDecodeError:
-                print("Error: Invalid JSON in GOOGLE_APPLICATION_CREDENTIALS_JSON")
-                creds_data = {}
-        f.flush()
-        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = f.name
-else:
+    try:
+        # Parse the JSON string to validate it
+        creds_data = json.loads(google_creds_json)
+        
+        # Create temporary file with credentials
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+            json.dump(creds_data, f)
+            f.flush()
+            os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = f.name
+            print(f"Google credentials loaded from environment variable to: {f.name}")
+    except json.JSONDecodeError as e:
+        print(f"Error: Invalid JSON in GOOGLE_APPLICATION_CREDENTIALS_JSON: {e}")
+        print("Using local file fallback...")
+        google_creds_json = None
+        
+if not google_creds_json:
     # For local development - use file path
     google_creds_file = os.getenv('GOOGLE_APPLICATION_CREDENTIALS', 'indiapost-439216-6a03ba3d322b.json')
     google_creds_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), google_creds_file)
     if os.path.exists(google_creds_path):
         os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = google_creds_path
+        print(f"Google credentials loaded from file: {google_creds_path}")
     else:
         print(f"Warning: Google credentials file not found at {google_creds_path}")
 
@@ -68,7 +69,13 @@ UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
-translate_client = translate.Client()
+# Initialize Google Translate client with error handling
+try:
+    translate_client = translate.Client()
+    print("Google Translate client initialized successfully")
+except Exception as e:
+    print(f"Error initializing Google Translate client: {e}")
+    translate_client = None
 
 # ---------- SUPABASE CONFIG ----------
 SUPABASE_URL = os.getenv("SUPABASE_URL")
@@ -359,8 +366,16 @@ def format_srt(segments, target_language=None):
 
 def translate_text(text, target_language):
     """Translate text using Google Translate API."""
-    result = translate_client.translate(text, target_language=target_language, format_="text")
-    return result["translatedText"]
+    if not translate_client:
+        print("Warning: Google Translate client not available, returning original text")
+        return text
+    
+    try:
+        result = translate_client.translate(text, target_language=target_language, format_="text")
+        return result["translatedText"]
+    except Exception as e:
+        print(f"Error translating text: {e}")
+        return text
 
 def get_user_id():
     """

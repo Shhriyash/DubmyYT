@@ -38,6 +38,10 @@ services:
         sync: false
       - key: REACT_APP_API_BASE_URL
         value: https://dubmyyt-backend-ftv2.onrender.com
+      - key: GENERATE_SOURCEMAP
+        value: false
+      - key: CI
+        value: false
     routes:
       - type: rewrite
         source: /*

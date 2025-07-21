@@ -23,8 +23,8 @@ const LANGUAGE_OPTIONS = [
 // Dynamic API URL - works with localhost and tunneled URLs
 const getApiBaseUrl = () => {
   // First priority: Environment variable
-  if (process.env.REACT_APP_API_URL) {
-    return process.env.REACT_APP_API_URL;
+  if (process.env.REACT_APP_API_URL || process.env.REACT_APP_API_BASE_URL) {
+    return process.env.REACT_APP_API_URL || process.env.REACT_APP_API_BASE_URL;
   }
   
   // Second priority: Detect if we're on localhost
@@ -601,7 +601,9 @@ function DubMyYT() {
       if (error.response && error.response.data && error.response.data.error) {
         const errorMessage = error.response.data.error;
         // Special handling for YouTube download errors
-        if (errorMessage.includes('HTTP Error 403') || errorMessage.includes('Forbidden')) {
+        if (errorMessage.includes('Sign in to confirm') || errorMessage.includes('bot') || errorMessage.includes('cookies')) {
+          showError('YouTube bot protection detected! Please wait 2-3 minutes and try again, or try a different video. This is a temporary restriction from YouTube.');
+        } else if (errorMessage.includes('HTTP Error 403') || errorMessage.includes('Forbidden')) {
           showError('YouTube download blocked. This video may be restricted or have anti-bot protection. Try a different video or try again later.');
         } else if (errorMessage.includes('Requested format is not available')) {
           showError('Video format not available. YouTube may have changed their format restrictions. Try a different video.');

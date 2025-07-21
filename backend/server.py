@@ -250,30 +250,44 @@ def download_audio(youtube_url):
         except Exception as e:
             logging.warning(f"Error cleaning uploads: {e}")
 
-    # Try multiple approaches for downloading
+    # Try multiple approaches for downloading with enhanced anti-bot evasion
     approaches = [
-        # Primary approach with anti-bot measures
+        # Primary approach with enhanced anti-bot measures
         {
             'format': 'bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best',
-            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
             'referer': 'https://www.youtube.com/',
-            'sleep_interval': 1,
-            'max_sleep_interval': 3,
-            'extractor_retries': 3,
+            'sleep_interval': 2,
+            'max_sleep_interval': 5,
+            'extractor_retries': 2,
             'file_access_retries': 3,
+            'socket_timeout': 30,
+            'http_headers': {
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.5',
+                'Accept-Encoding': 'gzip, deflate',
+                'DNT': '1',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1',
+            }
         },
-        # Fallback approach with different format selection
+        # Fallback approach with mobile user agent
         {
             'format': 'worstaudio/worst',
-            'user_agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'sleep_interval': 2,
-            'extractor_retries': 2,
-        },
-        # Last resort - any available format
-        {
-            'format': 'best/worst',
-            'user_agent': 'yt-dlp/2025.02.19',
+            'user_agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Mobile/15E148 Safari/604.1',
+            'sleep_interval': 3,
+            'max_sleep_interval': 6,
             'extractor_retries': 1,
+            'socket_timeout': 20,
+        },
+        # Conservative approach with minimal requests
+        {
+            'format': 'worst[height<=480]/worst',
+            'user_agent': 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
+            'sleep_interval': 5,
+            'extractor_retries': 1,
+            'socket_timeout': 15,
+            'no_check_certificate': True,
         }
     ]
     
@@ -321,12 +335,16 @@ def download_audio(youtube_url):
     # If all approaches failed, raise the last error
     if last_error:
         error_msg = str(last_error)
-        if "HTTP Error 403" in error_msg or "Forbidden" in error_msg:
+        if "Sign in to confirm you're not a bot" in error_msg or "bot" in error_msg.lower():
+            raise Exception("YouTube has detected automated access and requires human verification. This is a temporary restriction. Please try again in a few minutes, or try a different video. Some videos may require manual verification.")
+        elif "HTTP Error 403" in error_msg or "Forbidden" in error_msg:
             raise Exception("YouTube download blocked due to anti-bot protection. This video may be restricted or region-locked. Please try a different video or try again later.")
         elif "Requested format is not available" in error_msg:
             raise Exception("Video format not available. YouTube may have changed format restrictions for this video. Please try a different video.")
         elif "Video unavailable" in error_msg or "Private video" in error_msg:
             raise Exception("This video is unavailable, private, or has been removed. Please check the URL and try again.")
+        elif "cookies" in error_msg.lower():
+            raise Exception("YouTube requires authentication cookies. This is due to anti-bot protection. Please try a different video or wait a few minutes before trying again.")
         else:
             raise Exception(f"Failed to download video after trying multiple approaches: {error_msg}")
     else:

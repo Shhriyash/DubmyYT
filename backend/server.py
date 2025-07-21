@@ -94,11 +94,24 @@ try:
     if google_creds_file_path and os.path.exists(google_creds_file_path):
         # Explicitly set credentials from file
         os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = google_creds_file_path
-        translate_client = translate.Client()
-        print("Google Translate client initialized successfully")
+        
+        # For JSON string credentials, use explicit client initialization
+        if google_creds_json:
+            # Parse credentials and create client directly
+            creds_data = json.loads(google_creds_json)
+            translate_client = translate.Client.from_service_account_info(creds_data)
+            print("Google Translate client initialized successfully from JSON credentials")
+        else:
+            # Use file-based credentials
+            translate_client = translate.Client()
+            print("Google Translate client initialized successfully from file credentials")
     else:
         print("Google credentials file not available - translate features will be disabled")
         
+except json.JSONDecodeError as e:
+    print(f"Error parsing Google credentials JSON: {e}")
+    print("Translation features will be disabled - app will continue running")
+    translate_client = None
 except Exception as e:
     print(f"Error initializing Google Translate client: {e}")
     print("Translation features will be disabled - app will continue running")

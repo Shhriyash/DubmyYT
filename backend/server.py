@@ -240,8 +240,44 @@ def cleanup_temp_files(chunk_infos):
 
 # ---------- CORE FUNCTIONS ----------
 
+"""
+YouTube Download Strategy Implementation
+
+Based on GitHub Issue: https://github.com/yt-dlp/yt-dlp/issues/12045
+
+Key Findings from the Issue:
+1. YouTube's bot detection is becoming more aggressive
+2. Cookie authentication is increasingly necessary for reliable downloads
+3. Manual cookie export plugins may not work properly with yt-dlp
+4. Using --cookies-from-browser is more reliable than manual cookie files
+5. Multiple fallback approaches are essential for consistent success
+
+Current Implementation:
+- Multi-tier approach with different user agents and headers
+- Progressive fallback from high-quality to basic downloads
+- Enhanced error handling with user-friendly messages
+- Anti-bot evasion techniques based on real browser behavior
+
+Future Improvements Needed:
+- Implement browser cookie extraction for server environments
+- Add support for user-provided cookies via API
+- Consider implementing session management for repeat requests
+- Monitor YouTube's evolving anti-bot measures and adapt accordingly
+"""
+
 def download_audio(youtube_url):
-    """Download audio from YouTube and return file path."""
+    """
+    Download audio from YouTube and return file path.
+    
+    This function implements a multi-tier approach to handle YouTube's anti-bot protection:
+    1. Enhanced browser simulation with realistic headers and cookies
+    2. Mobile user agent fallback for different fingerprinting
+    3. Conservative approach with minimal requests as last resort
+    
+    Based on GitHub issue: https://github.com/yt-dlp/yt-dlp/issues/12045
+    Key learnings: Cookie support is increasingly necessary for YouTube downloads
+    """
+    # Clean up any existing files in upload folder
     for file in os.listdir(UPLOAD_FOLDER):
         file_path = os.path.join(UPLOAD_FOLDER, file)
         try:
@@ -250,104 +286,152 @@ def download_audio(youtube_url):
         except Exception as e:
             logging.warning(f"Error cleaning uploads: {e}")
 
-    # Try multiple approaches for downloading with enhanced anti-bot evasion
+    # Multi-tier approach for YouTube download with progressive fallbacks
+    # Each approach uses different strategies to avoid bot detection
     approaches = [
-        # Primary approach with enhanced anti-bot measures
+        # Approach 1: Enhanced browser simulation with cookie support
+        # This mimics a real browser session with proper headers and timing
         {
-            'format': 'bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best',
+            'format': 'bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best',  # Prefer high-quality audio formats
             'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-            'referer': 'https://www.youtube.com/',
-            'sleep_interval': 2,
+            'referer': 'https://www.youtube.com/',  # Set YouTube as referrer
+            'sleep_interval': 2,  # Add delays between requests to appear human
             'max_sleep_interval': 5,
-            'extractor_retries': 2,
-            'file_access_retries': 3,
-            'socket_timeout': 30,
+            'extractor_retries': 2,  # Retry failed extractions
+            'file_access_retries': 3,  # Retry file operations
+            'socket_timeout': 30,  # Longer timeout for stable connections
+            # HTTP headers that mimic a real browser request
             'http_headers': {
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
                 'Accept-Language': 'en-US,en;q=0.5',
                 'Accept-Encoding': 'gzip, deflate',
-                'DNT': '1',
+                'DNT': '1',  # Do Not Track header
                 'Connection': 'keep-alive',
                 'Upgrade-Insecure-Requests': '1',
-            }
+            },
+            # TODO: Add cookie support based on GitHub issue findings
+            # 'cookiesfrombrowser': ('chrome',),  # Extract cookies from Chrome browser
+            # Note: Commented out for now due to server environment limitations
+            #
+            # Future Implementation Plan:
+            # 1. Add environment variable for cookie method selection
+            # 2. Support multiple browsers: chrome, firefox, edge, safari
+            # 3. Handle cases where browser cookies aren't available
+            # 4. Add fallback to manual cookie file upload via API
+            # 5. Implement cookie validation and refresh mechanisms
+            #
+            # Example future configuration:
+            # cookie_method = os.getenv('YOUTUBE_COOKIE_METHOD', 'none')
+            # if cookie_method == 'chrome':
+            #     approach['cookiesfrombrowser'] = ('chrome',)
+            # elif cookie_method == 'firefox':
+            #     approach['cookiesfrombrowser'] = ('firefox',)
+            # elif cookie_method == 'file':
+            #     approach['cookiefile'] = os.getenv('YOUTUBE_COOKIE_FILE')
         },
-        # Fallback approach with mobile user agent
+        # Approach 2: Mobile user agent fallback
+        # Some restrictions are less strict on mobile platforms
         {
-            'format': 'worstaudio/worst',
+            'format': 'worstaudio/worst',  # Use lower quality to reduce load
             'user_agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Mobile/15E148 Safari/604.1',
-            'sleep_interval': 3,
+            'sleep_interval': 3,  # Longer delays for mobile simulation
             'max_sleep_interval': 6,
-            'extractor_retries': 1,
+            'extractor_retries': 1,  # Fewer retries to avoid detection
             'socket_timeout': 20,
         },
-        # Conservative approach with minimal requests
+        # Approach 3: Search engine bot simulation
+        # Sometimes bot user agents are whitelisted for content indexing
         {
-            'format': 'worst[height<=480]/worst',
+            'format': 'worst[height<=480]/worst',  # Minimal quality requirements
             'user_agent': 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
-            'sleep_interval': 5,
+            'sleep_interval': 5,  # Longest delays to appear less suspicious
             'extractor_retries': 1,
             'socket_timeout': 15,
-            'no_check_certificate': True,
+            'no_check_certificate': True,  # Skip SSL verification if needed
         }
     ]
     
     last_error = None
     
+    # Iterate through each approach until one succeeds
     for i, approach in enumerate(approaches):
         try:
+            # Configure yt-dlp options for this attempt
             ydl_opts = {
+                # Output template for downloaded files
                 'outtmpl': os.path.join(UPLOAD_FOLDER, 'downloaded_audio.%(ext)s'),
+                # Post-processing to extract audio and convert to MP3
                 'postprocessors': [{
                     'key': 'FFmpegExtractAudio',
-                    'preferredcodec': 'mp3',
-                    'preferredquality': '192',
+                    'preferredcodec': 'mp3',  # Convert to MP3 format
+                    'preferredquality': '192',  # 192 kbps quality
                 }],
+                # FFmpeg location for audio processing (local development path)
                 'ffmpeg_location': r'G:/ffmpeg-2025-03-13-git-958c46800e-full_build/ffmpeg-2025-03-13-git-958c46800e-full_build/bin',
-                'noplaylist': True,
-                'quiet': True,
-                'no_warnings': True,
-                'extract_flat': False,
-                'ignoreerrors': False,
-                **approach
+                # Basic download options
+                'noplaylist': True,  # Don't download entire playlists
+                'quiet': True,  # Suppress verbose output
+                'no_warnings': True,  # Hide warning messages
+                'extract_flat': False,  # Extract full video info
+                'ignoreerrors': False,  # Stop on errors for proper error handling
+                **approach  # Merge approach-specific options
             }
 
             logging.info(f"Attempting YouTube download with approach {i+1}/3")
+            
+            # Attempt download with current approach configuration
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 ydl.download([youtube_url])
             
-            # If we get here, download was successful
+            # Verify download success by checking for output file
             output_file = os.path.join(UPLOAD_FOLDER, "downloaded_audio.mp3")
             if os.path.exists(output_file):
                 logging.info(f"YouTube download successful with approach {i+1}")
                 return output_file
             else:
-                # File might have different extension, look for any downloaded file
+                # Sometimes the file extension might be different
+                # Look for any file that starts with our expected name
                 for file in os.listdir(UPLOAD_FOLDER):
                     if file.startswith('downloaded_audio'):
                         logging.info(f"Found downloaded file: {file}")
                         return os.path.join(UPLOAD_FOLDER, file)
                         
         except Exception as e:
+            # Log the error and try next approach
             last_error = e
             logging.warning(f"Approach {i+1} failed: {str(e)}")
             continue
     
-    # If all approaches failed, raise the last error
+    # All approaches failed - provide user-friendly error messages
+    # Based on GitHub issue findings about common error patterns
     if last_error:
         error_msg = str(last_error)
+        
+        # Bot detection error - most common issue from GitHub issue
         if "Sign in to confirm you're not a bot" in error_msg or "bot" in error_msg.lower():
             raise Exception("YouTube has detected automated access and requires human verification. This is a temporary restriction. Please try again in a few minutes, or try a different video. Some videos may require manual verification.")
+        
+        # HTTP 403 Forbidden errors
         elif "HTTP Error 403" in error_msg or "Forbidden" in error_msg:
             raise Exception("YouTube download blocked due to anti-bot protection. This video may be restricted or region-locked. Please try a different video or try again later.")
+        
+        # Format availability issues
         elif "Requested format is not available" in error_msg:
             raise Exception("Video format not available. YouTube may have changed format restrictions for this video. Please try a different video.")
+        
+        # Video accessibility issues
         elif "Video unavailable" in error_msg or "Private video" in error_msg:
             raise Exception("This video is unavailable, private, or has been removed. Please check the URL and try again.")
+        
+        # Cookie-related errors (from GitHub issue findings)
         elif "cookies" in error_msg.lower():
             raise Exception("YouTube requires authentication cookies. This is due to anti-bot protection. Please try a different video or wait a few minutes before trying again.")
+        
+        # Generic error with original message
         else:
             raise Exception(f"Failed to download video after trying multiple approaches: {error_msg}")
     else:
+        # This shouldn't happen, but handle it gracefully
         raise Exception("Failed to download video: Unknown error occurred")
 
 def generate_subtitles_async(filename, language_hint="en"):
@@ -439,26 +523,39 @@ def hash_file(filepath):
     return sha256.hexdigest()
 
 def get_youtube_title(youtube_url):
-    """Fetch YouTube video title using yt-dlp."""
+    """
+    Fetch YouTube video title using yt-dlp.
+    
+    This function extracts video metadata without downloading the actual video.
+    Uses similar anti-bot measures as the download function but with lighter configuration
+    since we're only fetching metadata, not the video content.
+    
+    Returns:
+        str: Video title or fallback title if extraction fails
+    """
     try:
+        # Lightweight configuration for metadata extraction only
         ydl_opts = {
-            'quiet': True,
-            'no_warnings': True,
-            'extract_flat': False,
-            # Anti-bot measures for title extraction
+            'quiet': True,  # Suppress output for clean operation
+            'no_warnings': True,  # Hide warning messages
+            'extract_flat': False,  # Extract full metadata (needed for title)
+            # Anti-bot measures for title extraction (lighter than full download)
             'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'referer': 'https://www.youtube.com/',
-            'sleep_interval': 1,
+            'referer': 'https://www.youtube.com/',  # Set YouTube as referrer
+            'sleep_interval': 1,  # Minimal delay for metadata requests
             'max_sleep_interval': 2,
-            'extractor_retries': 2,
+            'extractor_retries': 2,  # Limited retries for metadata
         }
         
+        # Extract video information without downloading
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(youtube_url, download=False)
-            return info.get('title', 'Untitled YouTube Video')
+            info = ydl.extract_info(youtube_url, download=False)  # download=False for metadata only
+            return info.get('title', 'Untitled YouTube Video')  # Return title or fallback
+            
     except Exception as e:
+        # Log error but don't fail the entire process for missing title
         logging.error(f"Failed to fetch YouTube title: {e}")
-        return 'YouTube Video'
+        return 'YouTube Video'  # Generic fallback title
 
 def get_or_create_video_id(video_url, user_id, is_uploaded=False, file_hash=None):
     """

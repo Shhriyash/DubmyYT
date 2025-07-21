@@ -1,5 +1,7 @@
 import os
-import yt_dlp
+# import yt_dlp  # COMMENTED OUT - REPLACED WITH PYTUBEFIX
+from pytubefix import YouTube
+from pytubefix.cli import on_progress
 import tempfile
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -30,7 +32,7 @@ google_creds_json = os.getenv('GOOGLE_APPLICATION_CREDENTIALS_JSON')
 google_creds_file_path = None
 
 if google_creds_json:
-    # For production deployment (Render) - use JSON string
+    # For production deployment (Render) - validate JSON string
     try:
         # Parse the JSON string to validate it
         creds_data = json.loads(google_creds_json)
@@ -43,13 +45,7 @@ if google_creds_json:
             print(f"Error: Missing required fields in credentials: {missing_fields}")
             google_creds_json = None
         else:
-            # Create temporary file with credentials
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
-                json.dump(creds_data, f)
-                f.flush()
-                google_creds_file_path = f.name
-                os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = f.name
-                print(f"Google credentials loaded from environment variable to: {f.name}")
+            print("Google credentials JSON validated successfully")
     except json.JSONDecodeError as e:
         print(f"Error: Invalid JSON in GOOGLE_APPLICATION_CREDENTIALS_JSON: {e}")
         print("Using local file fallback...")
@@ -63,11 +59,11 @@ if not google_creds_json:
     google_creds_file = os.getenv('GOOGLE_APPLICATION_CREDENTIALS', 'indiapost-439216-6a03ba3d322b.json')
     google_creds_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), google_creds_file)
     if os.path.exists(google_creds_path):
-        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = google_creds_path
         google_creds_file_path = google_creds_path
         print(f"Google credentials loaded from file: {google_creds_path}")
     else:
         print(f"Warning: Google credentials file not found at {google_creds_path}")
+        google_creds_file_path = None
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -246,33 +242,13 @@ def cleanup_temp_files(chunk_infos):
 
 # ---------- CORE FUNCTIONS ----------
 
+# REPLACING WITH PYTUBEFIX
+# The original yt-dlp implementation had multi-tier approach for YouTube's anti-bot protection
+# but we're switching to pytubefix for better reliability and simpler API
+
 """
-YouTube Download Strategy Implementation
-
-Based on GitHub Issue: https://github.com/yt-dlp/yt-dlp/issues/12045
-
-Key Findings from the Issue:
-1. YouTube's bot detection is becoming more aggressive
-2. Cookie authentication is increasingly necessary for reliable downloads
-3. Manual cookie export plugins may not work properly with yt-dlp
-4. Using --cookies-from-browser is more reliable than manual cookie files
-5. Multiple fallback approaches are essential for consistent success
-
-Current Implementation:
-- Multi-tier approach with different user agents and headers
-- Progressive fallback from high-quality to basic downloads
-- Enhanced error handling with user-friendly messages
-- Anti-bot evasion techniques based on real browser behavior
-
-Future Improvements Needed:
-- Implement browser cookie extraction for server environments
-- Add support for user-provided cookies via API
-- Consider implementing session management for repeat requests
-- Monitor YouTube's evolving anti-bot measures and adapt accordingly
-"""
-
 def download_audio(youtube_url):
-    """
+    \"\"\"
     Download audio from YouTube and return file path.
     
     This function implements a multi-tier approach to handle YouTube's anti-bot protection:
@@ -282,7 +258,9 @@ def download_audio(youtube_url):
     
     Based on GitHub issue: https://github.com/yt-dlp/yt-dlp/issues/12045
     Key learnings: Cookie support is increasingly necessary for YouTube downloads
-    """
+    
+    NOTE: This function has been replaced with pytubefix implementation below
+    \"\"\"
     # Clean up any existing files in upload folder
     for file in os.listdir(UPLOAD_FOLDER):
         file_path = os.path.join(UPLOAD_FOLDER, file)
@@ -439,6 +417,123 @@ def download_audio(youtube_url):
     else:
         # This shouldn't happen, but handle it gracefully
         raise Exception("Failed to download video: Unknown error occurred")
+"""
+
+# PYTUBEFIX IMPLEMENTATION
+def download_audio(youtube_url):
+    """
+    Download audio from YouTube using pytubefix library.
+    
+    pytubefix offers several advantages over yt-dlp:
+    - Simpler API and more reliable for audio-only downloads
+    - Better handling of YouTube's anti-bot measures
+    - Native Python implementation with built-in progress tracking
+    - More consistent file handling and naming
+    
+    Returns:
+        str: Path to the downloaded audio file (.m4a format)
+    """
+    try:
+        # Clean up any existing files in upload folder
+        for file in os.listdir(UPLOAD_FOLDER):
+            file_path = os.path.join(UPLOAD_FOLDER, file)
+            try:
+                if os.path.isfile(file_path):
+                    os.unlink(file_path)
+            except Exception as e:
+                logging.warning(f"Error cleaning uploads: {e}")
+
+        logging.info(f"Starting YouTube download with pytubefix for URL: {youtube_url}")
+        
+        # Create YouTube object with progress callback
+        yt = YouTube(youtube_url, on_progress_callback=on_progress)
+        
+        # Log video title for debugging
+        logging.info(f"Video title: {yt.title}")
+        print(f"Downloading: {yt.title}")
+        
+        # Get the highest quality audio-only stream
+        # This will download .m4a format which is compatible with our transcription pipeline
+        audio_stream = yt.streams.get_audio_only()
+        
+        if not audio_stream:
+            # Fallback: try to get any audio stream if audio-only not available
+            audio_stream = yt.streams.filter(only_audio=True).first()
+            
+        if not audio_stream:
+            # Last resort: get lowest quality video stream and extract audio later
+            audio_stream = yt.streams.get_lowest_resolution()
+            
+        if not audio_stream:
+            raise Exception("No suitable audio streams found for this video")
+        
+        # Set the output filename to match our expected format
+        output_filename = "downloaded_audio"
+        
+        # Download the audio file
+        logging.info(f"Downloading audio stream: {audio_stream.mime_type}, {audio_stream.abr}")
+        downloaded_file = audio_stream.download(
+            output_path=UPLOAD_FOLDER,
+            filename=output_filename
+        )
+        
+        logging.info(f"Download completed: {downloaded_file}")
+        
+        # Convert .m4a to .mp3 if needed using pydub
+        if downloaded_file.endswith('.m4a'):
+            mp3_file = os.path.join(UPLOAD_FOLDER, "downloaded_audio.mp3")
+            try:
+                # Convert m4a to mp3 using pydub
+                audio = AudioSegment.from_file(downloaded_file, format="m4a")
+                audio.export(mp3_file, format="mp3", bitrate="192k")
+                
+                # Clean up the original m4a file
+                os.remove(downloaded_file)
+                
+                logging.info(f"Converted to MP3: {mp3_file}")
+                return mp3_file
+            except Exception as e:
+                logging.warning(f"Failed to convert to MP3: {e}. Using original file.")
+                return downloaded_file
+        
+        return downloaded_file
+        
+    except Exception as e:
+        error_msg = str(e)
+        logging.error(f"pytubefix download failed: {error_msg}")
+        
+        # Provide user-friendly error messages
+        if "unavailable" in error_msg.lower():
+            raise Exception("This video is unavailable, private, or has been removed. Please check the URL and try again.")
+        elif "age" in error_msg.lower() and "restricted" in error_msg.lower():
+            raise Exception("This video is age-restricted and cannot be downloaded. Please try a different video.")
+        elif "live" in error_msg.lower():
+            raise Exception("Live streams cannot be downloaded. Please try a regular video.")
+        elif "private" in error_msg.lower():
+            raise Exception("This video is private and cannot be accessed. Please try a different video.")
+        elif "region" in error_msg.lower() or "blocked" in error_msg.lower():
+            raise Exception("This video is blocked in your region. Please try a different video.")
+        else:
+            raise Exception(f"Failed to download video: {error_msg}")
+
+def get_youtube_title(youtube_url):
+    """
+    Fetch YouTube video title using pytubefix.
+    
+    This function extracts video metadata without downloading the actual video.
+    
+    Returns:
+        str: Video title or fallback title if extraction fails
+    """
+    try:
+        # Create YouTube object for metadata extraction only
+        yt = YouTube(youtube_url)
+        return yt.title or 'Untitled YouTube Video'
+        
+    except Exception as e:
+        # Log error but don't fail the entire process for missing title
+        logging.error(f"Failed to fetch YouTube title with pytubefix: {e}")
+        return 'YouTube Video'  # Generic fallback title
 
 def generate_subtitles_async(filename, language_hint="en"):
     """
@@ -530,6 +625,27 @@ def hash_file(filepath):
 
 def get_youtube_title(youtube_url):
     """
+    Fetch YouTube video title using pytubefix.
+    
+    This function extracts video metadata without downloading the actual video.
+    
+    Returns:
+        str: Video title or fallback title if extraction fails
+    """
+    try:
+        # Create YouTube object for metadata extraction only
+        yt = YouTube(youtube_url)
+        return yt.title or 'Untitled YouTube Video'
+        
+    except Exception as e:
+        # Log error but don't fail the entire process for missing title
+        logging.error(f"Failed to fetch YouTube title with pytubefix: {e}")
+        return 'YouTube Video'  # Generic fallback title
+
+#OLD YT-DLP IMPLEMENTATION
+"""
+def get_youtube_title(youtube_url):
+    \"\"\"
     Fetch YouTube video title using yt-dlp.
     
     This function extracts video metadata without downloading the actual video.
@@ -538,7 +654,7 @@ def get_youtube_title(youtube_url):
     
     Returns:
         str: Video title or fallback title if extraction fails
-    """
+    \"\"\"
     try:
         # Lightweight configuration for metadata extraction only
         ydl_opts = {
@@ -562,6 +678,7 @@ def get_youtube_title(youtube_url):
         # Log error but don't fail the entire process for missing title
         logging.error(f"Failed to fetch YouTube title: {e}")
         return 'YouTube Video'  # Generic fallback title
+"""
 
 def get_or_create_video_id(video_url, user_id, is_uploaded=False, file_hash=None):
     """

@@ -366,8 +366,8 @@ def download_audio(youtube_url):
                     'preferredcodec': 'mp3',  # Convert to MP3 format
                     'preferredquality': '192',  # 192 kbps quality
                 }],
-                # FFmpeg location for audio processing (local development path)
-                'ffmpeg_location': r'G:/ffmpeg-2025-03-13-git-958c46800e-full_build/ffmpeg-2025-03-13-git-958c46800e-full_build/bin',
+                # FFmpeg location - use system PATH in production, local path for development
+                'ffmpeg_location': None if os.getenv('RENDER') else r'G:/ffmpeg-2025-03-13-git-958c46800e-full_build/ffmpeg-2025-03-13-git-958c46800e-full_build/bin',
                 # Basic download options
                 'noplaylist': True,  # Don't download entire playlists
                 'quiet': True,  # Suppress verbose output

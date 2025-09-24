@@ -479,15 +479,21 @@ def download_audio(youtube_url):
         
         logging.info(f"Download completed: {downloaded_file}")
         
-        # Convert .m4a to .mp3 if needed using pydub
-        if downloaded_file.endswith('.m4a'):
+        # Convert audio to .mp3 using pydub (works for m4a, webm, mp4, etc.)
+        # Check if file needs conversion by examining the actual format
+        needs_conversion = True
+        if downloaded_file.endswith('.mp3'):
+            needs_conversion = False
+        
+        if needs_conversion:
             mp3_file = os.path.join(UPLOAD_FOLDER, "downloaded_audio.mp3")
             try:
-                # Convert m4a to mp3 using pydub
-                audio = AudioSegment.from_file(downloaded_file, format="m4a")
+                # Convert audio to mp3 using pydub (auto-detects format)
+                logging.info(f"Converting audio to MP3...")
+                audio = AudioSegment.from_file(downloaded_file)
                 audio.export(mp3_file, format="mp3", bitrate="192k")
                 
-                # Clean up the original m4a file
+                # Clean up the original file
                 os.remove(downloaded_file)
                 
                 logging.info(f"Converted to MP3: {mp3_file}")

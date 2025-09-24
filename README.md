@@ -2,7 +2,7 @@
 
 A comprehensive full-stack application for video transcription, translation,summarization and intelligent content analysis using simple AI technologies.
 
-##Demo Video
+## Demo Video
 https://github.com/user-attachments/assets/af5869b9-6c66-4936-959b-f2370b85b481
 
 ## Table of Contents

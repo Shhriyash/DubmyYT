@@ -21,31 +21,19 @@ const LandingPage = () => {
   };
 
   const goToApp = (feature) => {
-    // Temporary bypass for Supabase outage - skip authentication
-    const TEMP_BYPASS_AUTH = process.env.REACT_APP_ENV === 'production' || process.env.NODE_ENV === 'production';
-    
-    if (TEMP_BYPASS_AUTH) {
-      console.warn('⚠️ TEMPORARY: Skipping authentication due to Supabase ap-south-1 region outage');
-      navigate('/app', { 
-        state: { 
-          defaultFeature: feature,
-          mode: feature === 'subtitles' ? 'subtitles-only' : 'all'
-        } 
-      });
-      return;
-    }
-
-    const session = supabase.auth.getSession();
-    if (!session) {
-      navigate('/auth', { state: { from: '/app', feature } });
-    } else {
-      navigate('/app', { 
-        state: { 
-          defaultFeature: feature,
-          mode: feature === 'subtitles' ? 'subtitles-only' : 'all'
-        } 
-      });
-    }
+    // Check if user is authenticated
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
+        navigate('/auth', { state: { from: '/app', feature } });
+      } else {
+        navigate('/app', { 
+          state: { 
+            defaultFeature: feature,
+            mode: feature === 'subtitles' ? 'subtitles-only' : 'all'
+          } 
+        });
+      }
+    });
   };
 
   useEffect(() => {

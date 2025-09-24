@@ -675,16 +675,6 @@ function DubMyYT() {
   }, [videoBackground, isYoutubeVideo]);
 
   useEffect(() => {
-    // Temporary bypass for Supabase outage
-    const TEMP_BYPASS_AUTH = process.env.REACT_APP_ENV === 'production' || process.env.NODE_ENV === 'production';
-    
-    if (TEMP_BYPASS_AUTH) {
-      console.warn('⚠️ TEMPORARY: Using temporary user ID due to Supabase ap-south-1 region outage');
-      setUserId('temp-user-id');
-      setUserEmail('temp@dubmyyt.com');
-      return;
-    }
-
     supabase.auth.getUser().then(({ data: { user } }) => {
       setUserId(user?.id || null);
       setUserEmail(user?.email || null);
@@ -693,12 +683,8 @@ function DubMyYT() {
       }
     }).catch(error => {
       console.error('Supabase auth error:', error);
-      // Fallback to temporary user if Supabase is down
-      if (error.message.includes('NetworkError') || error.message.includes('CORS')) {
-        console.warn('⚠️ TEMPORARY: Using temporary user ID due to connectivity issues');
-        setUserId('temp-user-id');
-        setUserEmail('temp@dubmyyt.com');
-      }
+      setUserId(null);
+      setUserEmail(null);
     });
     
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {

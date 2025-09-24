@@ -1,6 +1,9 @@
-# DubMyYT - AI-Powered Video Transformation Platform
+# DubMyYT - AI-Powered Video Subtitling and Summarizing Platform
 
-A comprehensive full-stack application for video transcription, translation, and intelligent content analysis using advanced AI technologies.
+A comprehensive full-stack application for video transcription, translation,summarization and intelligent content analysis using simple AI technologies.
+
+##Demo Video
+https://github.com/user-attachments/assets/af5869b9-6c66-4936-959b-f2370b85b481
 
 ## Table of Contents
 
@@ -288,15 +291,21 @@ def translate_text(text, target_language):
 ### Video Processing
 - **YouTube Integration**: Direct video processing from YouTube URLs
 - **File Upload Support**: Process local video and audio files
-- **Real-time Progress Tracking**: Live updates during processing
 - **Multiple Format Support**: MP4, MP3, WAV, and other common formats
 
-### AI-Powered Transcription
+### AI-Powered Subtitle Generation
 - **Automatic Speech Recognition**: Using Groq's Whisper AI model
 - **High Accuracy**: Advanced language model for precise transcription
 - **Multiple Languages**: Support for 50+ languages
-- **Timestamp Generation**: Precise time-aligned transcriptions
-
+- **Timestamp Generation**: Precise time-aligned subtitles
+  
+### Content Summarization
+- **Intelligent Summaries**: AI-generated content summaries
+- **Customizable Length**: Short, medium, and detailed summaries
+- **Key Points Extraction**: Highlight important concepts
+- **Topic Categorization**: Automatic content categorization
+- **Summary Templates**: Different summary formats for various use cases
+  
 ### Multi-Language Translation
 - **Google Translate Integration**: Professional-grade translation quality
 - **100+ Language Support**: Comprehensive language coverage
@@ -351,13 +360,6 @@ def translate_text(text, target_language):
 - **Progress Tracking**: Monitor learning progress
 - **Performance Analytics**: Detailed quiz performance metrics
 - **Custom Quiz Creation**: User-generated quiz questions
-
-### Content Summarization
-- **Intelligent Summaries**: AI-generated content summaries
-- **Customizable Length**: Short, medium, and detailed summaries
-- **Key Points Extraction**: Highlight important concepts
-- **Topic Categorization**: Automatic content categorization
-- **Summary Templates**: Different summary formats for various use cases
 
 ### Advanced Analytics
 - **Learning Insights**: Track learning patterns and preferences

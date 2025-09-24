@@ -2,18 +2,21 @@ import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../../supabase/config';
 import './AuthPage.css';
+import authVideo from '../../assets/Untitled design.mp4';
 
 const AuthPage = () => {
-  const [isSignUp, setIsSignUp] = useState(false);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const from = location.state?.from || '/';
+  const feature = location.state?.feature;
+  const initialMode = location.state?.mode || 'login'; // Get mode from navigation state
+  
+  const [isSignUp, setIsSignUp] = useState(initialMode === 'signup');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [signUpSuccess, setSignUpSuccess] = useState(false);
-  const navigate = useNavigate();
-  const location = useLocation();
-  const from = location.state?.from || '/';
-  const feature = location.state?.feature;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -56,6 +59,21 @@ const AuthPage = () => {
 
   return (
     <div className="auth-container">
+      {/* Video Background */}
+      <video 
+        className="auth-video-background"
+        autoPlay 
+        loop 
+        muted 
+        playsInline
+      >
+        <source src={authVideo} type="video/mp4" />
+        Your browser does not support the video tag.
+      </video>
+      
+      {/* Semi-transparent overlay */}
+      <div className="auth-overlay" />
+      
       <div className="auth-box">
         <h2>{isSignUp ? 'Create Account' : 'Welcome Back'}</h2>
         {error && <div className="auth-error">{error}</div>}

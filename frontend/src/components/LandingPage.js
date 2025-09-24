@@ -4,6 +4,8 @@ import './LandingPage.css';
 import { supabase } from '../supabase/config';
 import UserMenu from './UserMenu';
 import videoBackground from '../assets/video_viral.jpg';
+import subtitleIcon from '../assets/cc.jpg';
+import summaryIcon from '../assets/summary.png';
 
 const words = ["Transform Your Videos", "Generate Subtitles", "Summarize Your Videos"];
 
@@ -116,8 +118,8 @@ const LandingPage = () => {
             <UserMenu userEmail={user.email} />
           ) : (
             <>
-              <button className="login-btn" onClick={() => navigate('/auth')}>Login</button>
-              <button className="signup-btn" onClick={() => navigate('/auth')}>Sign Up</button>
+              <button className="login-btn" onClick={() => navigate('/auth', { state: { mode: 'login' } })}>Login</button>
+              <button className="signup-btn" onClick={() => navigate('/auth', { state: { mode: 'signup' } })}>Sign Up</button>
             </>
           )}
         </div>
@@ -128,14 +130,18 @@ const LandingPage = () => {
         
         <div className="feature-cards">
           <div className="feature-card" onClick={() => goToApp('subtitles')}>
-            <div className="card-icon">🎬</div>
+            <div className="card-icon">
+              <img src={subtitleIcon} alt="Subtitles" className="feature-icon" />
+            </div>
             <h3>Subtitles</h3>
             <p>Generate accurate subtitles with timestamps</p>
             <button className="try-now-btn">Try Now</button>
           </div>
 
           <div className="feature-card" onClick={() => goToApp('summarize')}>
-            <div className="card-icon">📝</div>
+            <div className="card-icon">
+              <img src={summaryIcon} alt="Summarize" className="feature-icon" />
+            </div>
             <h3>Summarize</h3>
             <p>Get a concise summary of your content</p>
             <button className="try-now-btn">Try Now</button>

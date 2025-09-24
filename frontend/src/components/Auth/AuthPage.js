@@ -46,7 +46,18 @@ const AuthPage = () => {
         }
       }
     } catch (err) {
-      setError(err.message);
+      console.error('Authentication error:', err);
+      
+      // Handle different types of errors
+      if (err.message.includes('NetworkError') || err.message.includes('fetch')) {
+        setError('Network connection error. Please check your internet connection and try again.');
+      } else if (err.message.includes('CORS') || err.message.includes('Cross-Origin')) {
+        setError('Authentication service temporarily unavailable. Please try again in a few moments.');
+      } else if (err.message.includes('Invalid login credentials')) {
+        setError('Invalid email or password. Please check your credentials and try again.');
+      } else {
+        setError(err.message || 'An unexpected error occurred. Please try again.');
+      }
     } finally {
       setLoading(false);
     }

@@ -7,4 +7,25 @@ if (!supabaseUrl || !supabaseKey) {
   throw new Error('Supabase URL and Anon Key are required!');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseKey);
+// Enhanced Supabase client configuration for better CORS handling
+export const supabase = createClient(supabaseUrl, supabaseKey, {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true,
+    flowType: 'pkce'
+  },
+  global: {
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  },
+  db: {
+    schema: 'public',
+  },
+  realtime: {
+    params: {
+      eventsPerSecond: 2,
+    },
+  },
+});
